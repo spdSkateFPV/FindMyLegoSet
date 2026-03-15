@@ -187,6 +187,20 @@
     .progress-fill.done { background: var(--green); }
     .badge-done { font-size: 11px; font-weight: 700; color: var(--green); background: #E6F7EE; padding: 3px 8px; border-radius: 20px; white-space: nowrap; }
 
+
+    .delete-btn {
+      background: none;
+      border: none;
+      font-size: 20px;
+      padding: 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+      opacity: 0.5;
+      transition: opacity 0.2s, transform 0.1s;
+      border-radius: 10px;
+    }
+    .delete-btn:active { opacity: 1; transform: scale(0.85); }
+
     /* Empty state */
     .empty {
       text-align: center;
@@ -604,6 +618,19 @@
   </div>
 
 
+
+  <!-- MODAL: Set löschen -->
+  <div class="modal-overlay" id="delete-modal">
+    <div class="modal-box">
+      <div class="modal-title">Set löschen?</div>
+      <div class="modal-body" id="delete-modal-body">Möchtest du dieses Set wirklich löschen? Der gesamte Fortschritt geht verloren.</div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="hideDeleteModal()">Abbrechen</button>
+        <button class="btn btn-primary" style="background:var(--red);" onclick="deleteSet()">Löschen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============================================================
   JAVASCRIPT – DIE LOGIK DER APP
 
@@ -624,7 +651,7 @@
     // ⚠️ HIER DEINEN REBRICKABLE API KEY EINTRAGEN ⚠️
     // Kostenlos unter: https://rebrickable.com/api/
     // ============================================================
-    const API_KEY = 'b7af931a8f0d75f5bc32351850a26b5d';
+    const API_KEY = 'DEIN_API_KEY_HIER';
     const BASE_URL = 'https://rebrickable.com/api/v3/lego';
 
     // ============================================================
@@ -732,9 +759,9 @@
         : '';
 
       return `
-        <div class="set-card ${set.isCompleted ? 'completed' : ''}" onclick="openSession('${set.id}')">
-          <div class="set-thumb">${thumb}</div>
-          <div class="set-info">
+        <div class="set-card ${set.isCompleted ? 'completed' : ''}">
+          <div class="set-thumb" onclick="openSession('${set.id}')">${thumb}</div>
+          <div class="set-info" onclick="openSession('${set.id}')" style="cursor:pointer;">
             <div class="set-name">${set.name}</div>
             <div class="set-meta" style="display:flex;justify-content:space-between;align-items:center;">
               <span>${set.setNum} · ${set.year}</span>
@@ -742,6 +769,7 @@
             </div>
             ${bar}
           </div>
+          <button class="delete-btn" onclick="confirmDeleteSet('${set.id}')" aria-label="Set löschen">🗑️</button>
         </div>`;
     }
 
@@ -1104,6 +1132,34 @@
     document.getElementById('set-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') loadSet();
     });
+
+
+    // ============================================================
+    // SET LÖSCHEN
+    // ============================================================
+    let setToDeleteId = null;
+
+    function confirmDeleteSet(setId) {
+      const set = state.sets.find(s => s.id === setId);
+      if (!set) return;
+      setToDeleteId = setId;
+      document.getElementById('delete-modal-body').textContent =
+        `Möchtest du "${set.name}" wirklich löschen? Der gesamte Fortschritt geht verloren.`;
+      document.getElementById('delete-modal').classList.add('visible');
+    }
+
+    function hideDeleteModal() {
+      document.getElementById('delete-modal').classList.remove('visible');
+      setToDeleteId = null;
+    }
+
+    function deleteSet() {
+      if (!setToDeleteId) return;
+      state.sets = state.sets.filter(s => s.id !== setToDeleteId);
+      saveState();
+      hideDeleteModal();
+      renderHome();
+    }
 
     // ============================================================
     // APP START
