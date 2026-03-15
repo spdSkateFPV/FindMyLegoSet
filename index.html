@@ -288,6 +288,7 @@
     let cardList       = [];
     let sessionHistory = [];
     let popupContext   = null;
+    let repeatMode     = false;
 
     function migrateSet(set) {
       set.parts.forEach(p => {
@@ -392,7 +393,7 @@
           else                                       p.confirmedCount = 0;
         }
       });
-      activeSetId=setId; cardList=buildCardList(set); sessionHistory=[];
+      activeSetId=setId; cardList=buildCardList(set); sessionHistory=[]; repeatMode=false;
       // Use the saved index directly – computeStartIndex was broken for left-swipes
       currentIndex = Math.min(set.currentIndex || 0, cardList.length);
       document.getElementById('session-title').textContent=set.name;
@@ -439,11 +440,13 @@
     function swipeCard(confirmed) {
       const set=state.sets.find(s=>s.id===activeSetId);
       if (!set||currentIndex>=cardList.length) return;
-      const {partIdx,instance}=cardList[currentIndex];
+      const {partIdx}=cardList[currentIndex];
       const p=set.parts[partIdx];
-      sessionHistory.push({partIdx,instance,wasConfirmed:confirmed});
-      if (confirmed && instance>(p.confirmedCount||0)) p.confirmedCount=instance;
-      currentIndex++; set.currentIndex=currentIndex;
+      sessionHistory.push({partIdx, wasConfirmed:confirmed});
+      if (confirmed) p.confirmedCount = (p.confirmedCount||0) + 1;
+      currentIndex++;
+      // Only save currentIndex to set if NOT in repeat mode
+      if (!repeatMode) set.currentIndex = currentIndex;
       saveState(); renderCard();
     }
 
@@ -452,7 +455,7 @@
       const last=sessionHistory.pop();
       const set=state.sets.find(s=>s.id===activeSetId);
       const p=set.parts[last.partIdx];
-      if (last.wasConfirmed && (p.confirmedCount||0)>=last.instance) p.confirmedCount=last.instance-1;
+      if (last.wasConfirmed) p.confirmedCount = Math.max(0, (p.confirmedCount||0) - 1);
       currentIndex--; set.currentIndex=currentIndex;
       saveState();
       document.getElementById('completion-screen').classList.remove('visible');
@@ -568,17 +571,18 @@
       showView('home');
     }
     function repeatMissing(){
-      // Build a cardList with only the missing parts and restart
       const set=state.sets.find(s=>s.id===activeSetId);
       if(!set)return;
-      const missing=set.parts.filter(p=>(p.confirmedCount||0)<p.quantity);
-      if(!missing.length)return;
-      // Temporarily override cardList with only missing parts
+      const missingParts=set.parts.filter(p=>(p.confirmedCount||0)<p.quantity);
+      if(!missingParts.length)return;
+      // Build cardList from missing parts only
+      // We do NOT update set.currentIndex during repeat mode
+      repeatMode=true;
       cardList=[];
-      missing.forEach(p=>{
+      missingParts.forEach(p=>{
         const pi=set.parts.indexOf(p);
-        const already=p.confirmedCount||0;
-        for(let i=already+1;i<=p.quantity;i++) cardList.push({partIdx:pi,instance:i,total:p.quantity});
+        const missing=p.quantity-(p.confirmedCount||0);
+        for(let i=1;i<=missing;i++) cardList.push({partIdx:pi,instance:i,total:missing});
       });
       currentIndex=0; sessionHistory=[];
       document.getElementById('completion-screen').classList.remove('visible');
@@ -592,7 +596,7 @@
     function restartSession(){
       const set=state.sets.find(s=>s.id===activeSetId);
       if(set){set.parts.forEach(p=>p.confirmedCount=0);set.currentIndex=0;saveState();}
-      currentIndex=0;sessionHistory=[];cardList=buildCardList(state.sets.find(s=>s.id===activeSetId));
+      currentIndex=0;sessionHistory=[];repeatMode=false;cardList=buildCardList(state.sets.find(s=>s.id===activeSetId));
       document.getElementById('completion-screen').classList.remove('visible');
       document.getElementById('part-card').style.display='block';
       document.getElementById('swipe-hint').style.display='flex';
