@@ -8,7 +8,7 @@
 // Für unsere App ist er vor allem nötig damit der Browser die
 // App als "echte PWA" anerkennt und die Installation anbietet.
 
-const CACHE_NAME = 'lego-checker-v1';
+const CACHE_NAME = 'lego-checker-v3';
 
 // Beim Installieren: Grunddateien cachen
 self.addEventListener('install', event => {
