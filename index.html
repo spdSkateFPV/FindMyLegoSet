@@ -221,7 +221,8 @@
           <div class="stat-box red">  <div class="num" id="stat-missing">0</div>  <div class="lbl">Fehlen</div></div>
         </div>
         <button class="btn btn-primary" onclick="completeSet()" style="margin-bottom:10px;">Set als fertig markieren &#x2705;</button>
-        <button class="btn btn-ghost"   onclick="restartSession()" style="color:var(--gray);margin-bottom:20px;">Nochmal von vorne</button>
+        <button class="btn btn-ghost"   onclick="restartSession()" style="color:var(--gray);margin-bottom:8px;">Nochmal von vorne</button>
+        <button class="btn btn-ghost" id="repeat-missing-btn" onclick="repeatMissing()" style="color:var(--red);font-weight:800;margin-bottom:20px;display:none;">&#x1F501; Fehlende Teile wiederholen</button>
         <div class="missing-list-section" id="missing-list-section" style="display:none">
           <p class="missing-list-title">&#x274C; Fehlende Teile</p>
           <div id="missing-list"></div>
@@ -392,7 +393,8 @@
         }
       });
       activeSetId=setId; cardList=buildCardList(set); sessionHistory=[];
-      currentIndex=computeStartIndex(set);
+      // Use the saved index directly – computeStartIndex was broken for left-swipes
+      currentIndex = Math.min(set.currentIndex || 0, cardList.length);
       document.getElementById('session-title').textContent=set.name;
       document.getElementById('completion-screen').classList.remove('visible');
       document.getElementById('part-card').style.display='block';
@@ -548,6 +550,7 @@
       document.getElementById('completion-sub').textContent=missing>0?missing+' Stück fehlen noch.':'Alle Teile vorhanden – perfekt! 🏆';
       const mp=set.parts.filter(p=>(p.confirmedCount||0)<p.quantity);
       const sec=document.getElementById('missing-list-section'),lst=document.getElementById('missing-list');
+      document.getElementById('repeat-missing-btn').style.display = mp.length ? 'block' : 'none';
       if(mp.length){
         sec.style.display='block';
         lst.innerHTML=mp.map(p=>{
@@ -563,6 +566,28 @@
       if(s){s.isCompleted=true;s.dateCompleted=new Date().toISOString();saveState();}
       showView('home');
     }
+    function repeatMissing(){
+      // Build a cardList with only the missing parts and restart
+      const set=state.sets.find(s=>s.id===activeSetId);
+      if(!set)return;
+      const missing=set.parts.filter(p=>(p.confirmedCount||0)<p.quantity);
+      if(!missing.length)return;
+      // Temporarily override cardList with only missing parts
+      cardList=[];
+      missing.forEach(p=>{
+        const pi=set.parts.indexOf(p);
+        const already=p.confirmedCount||0;
+        for(let i=already+1;i<=p.quantity;i++) cardList.push({partIdx:pi,instance:i,total:p.quantity});
+      });
+      currentIndex=0; sessionHistory=[];
+      document.getElementById('completion-screen').classList.remove('visible');
+      document.getElementById('card-area').classList.remove('scrollable');
+      document.getElementById('part-card').style.display='block';
+      document.getElementById('swipe-hint').style.display='flex';
+      document.getElementById('action-bar').style.display='flex';
+      renderCard();
+    }
+
     function restartSession(){
       const set=state.sets.find(s=>s.id===activeSetId);
       if(set){set.parts.forEach(p=>p.confirmedCount=0);set.currentIndex=0;saveState();}
