@@ -2,7 +2,7 @@
   "name": "Lego Checker",
   "short_name": "LegoCheck",
   "description": "Überprüfe deine Lego-Sets Teil für Teil",
-  "start_url": "/lego-checker/",
+  "start_url": "/FindMyLegoSet/",
   "display": "standalone",
   "background_color": "#FFF9F0",
   "theme_color": "#E3000B",
