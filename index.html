@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="LegoCheck">
+  <meta name="theme-color" content="#E3000B">
+  <title>Lego Checker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;900&family=Lilita+One&display=swap" rel="stylesheet">
+
+  <!-- ============================================================
+  STYLES
+  ============================================================
+  CSS beschreibt das AUSSEHEN der App: Farben, Abstände,
+  Animationen, Schriften. Wir nutzen CSS-Variablen (--name)
+  damit wir Farben nur einmal definieren und überall nutzen.
+  ============================================================ -->
+  <style>
+    /* --- Variablen & Reset --- */
+    :root {
+      --red:     #E3000B;
+      --yellow:  #FFD700;
+      --dark:    #1A1A2E;
+      --bg:      #FFF9F0;
+      --card-bg: #FFFFFF;
+      --gray:    #8A8A9A;
+      --light:   #F0EDE8;
+      --green:   #00A650;
+      --shadow:  0 8px 32px rgba(26,26,46,0.12);
+      --radius:  20px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: var(--bg);
+      color: var(--dark);
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      /* Verhindert das "Ziehen" der Seite beim Wischen auf iOS */
+      overscroll-behavior: none;
+    }
+
+    /* --- VIEWS (Bildschirme) ---
+       Alle Views existieren im DOM, aber nur eine ist sichtbar.
+       "display:none" = versteckt, "display:flex/block" = sichtbar.
+       Wir wechseln zwischen Views per JavaScript.
+    */
+    .view { display: none; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+    .view.active { display: flex; }
+
+    /* --- HEADER --- */
+    .header {
+      background: var(--card-bg);
+      padding: 16px 20px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid var(--light);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-title {
+      font-family: 'Lilita One', sans-serif;
+      font-size: 22px;
+      color: var(--red);
+      letter-spacing: 0.5px;
+    }
+    .header-title span { color: var(--dark); }
+
+    /* --- BUTTONS --- */
+    .btn {
+      border: none;
+      border-radius: 14px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.1s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn:active { transform: scale(0.95); }
+    .btn-primary {
+      background: var(--red);
+      color: white;
+      padding: 14px 24px;
+      font-size: 16px;
+      width: 100%;
+      justify-content: center;
+      border-radius: 16px;
+    }
+    .btn-icon {
+      background: var(--red);
+      color: white;
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      justify-content: center;
+      font-size: 22px;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--gray);
+      padding: 8px 12px;
+      font-size: 15px;
+    }
+    .btn:disabled { opacity: 0.45; pointer-events: none; }
+
+    /* --- HOME VIEW --- */
+    #view-home .content {
+      flex: 1;
+      padding: 20px 16px;
+      overflow-y: auto;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--gray);
+      margin-bottom: 10px;
+    }
+
+    /* Lego-Stud Muster als dekorativer Hintergrund */
+    .stud-banner {
+      background: var(--red);
+      background-image: radial-gradient(circle, rgba(255,255,255,0.18) 8px, transparent 8px);
+      background-size: 28px 28px;
+      background-position: 0 0;
+      border-radius: var(--radius);
+      padding: 20px;
+      color: white;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .stud-banner .icon { font-size: 48px; }
+    .stud-banner h2 { font-family: 'Lilita One', sans-serif; font-size: 18px; margin-bottom: 4px; }
+    .stud-banner p { font-size: 13px; opacity: 0.85; }
+
+    /* Set-Karte in der Liste */
+    .set-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 12px rgba(26,26,46,0.07);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      border: 2px solid transparent;
+    }
+    .set-card:active { transform: scale(0.98); box-shadow: var(--shadow); }
+    .set-card.completed { border-color: var(--green); }
+    .set-thumb {
+      width: 64px;
+      height: 48px;
+      border-radius: 10px;
+      object-fit: cover;
+      background: var(--light);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      overflow: hidden;
+    }
+    .set-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .set-info { flex: 1; min-width: 0; }
+    .set-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .set-meta { font-size: 12px; color: var(--gray); margin-top: 2px; }
+    .progress-bar { height: 5px; background: var(--light); border-radius: 99px; margin-top: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--yellow); border-radius: 99px; transition: width 0.4s; }
+    .progress-fill.done { background: var(--green); }
+    .badge-done { font-size: 11px; font-weight: 700; color: var(--green); background: #E6F7EE; padding: 3px 8px; border-radius: 20px; white-space: nowrap; }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 60px 30px;
+      color: var(--gray);
+    }
+    .empty .emoji { font-size: 64px; display: block; margin-bottom: 16px; }
+    .empty h3 { font-size: 18px; font-weight: 800; color: var(--dark); margin-bottom: 8px; }
+    .empty p { font-size: 14px; line-height: 1.6; }
+
+    /* --- SEARCH VIEW --- */
+    #view-search .content { flex: 1; padding: 24px 16px; }
+
+    .input-group { margin-bottom: 20px; }
+    .input-label { font-size: 13px; font-weight: 700; color: var(--dark); margin-bottom: 8px; display: block; }
+    .text-input {
+      width: 100%;
+      padding: 14px 16px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      border: 2.5px solid var(--light);
+      border-radius: 14px;
+      background: var(--card-bg);
+      color: var(--dark);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .text-input:focus { border-color: var(--red); }
+    .input-hint { font-size: 12px; color: var(--gray); margin-top: 8px; line-height: 1.5; }
+
+    .error-box {
+      background: #FEE8E8;
+      border: 1.5px solid #F5A0A0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      color: var(--red);
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .error-box.visible { display: block; }
+
+    .loading-state {
+      text-align: center;
+      padding: 30px;
+      display: none;
+    }
+    .loading-state.visible { display: block; }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 5px solid var(--light);
+      border-top-color: var(--red);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-weight: 700; font-size: 15px; }
+    .loading-sub { font-size: 13px; color: var(--gray); margin-top: 4px; }
+
+    /* --- CARD SESSION VIEW --- */
+    #view-session {
+      background: var(--bg);
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+    }
+
+    .session-header {
+      background: var(--card-bg);
+      padding: 16px 20px 12px;
+      border-bottom: 3px solid var(--light);
+    }
+    .session-title { font-weight: 800; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .session-progress-text { font-size: 13px; color: var(--gray); margin-top: 3px; }
+    .progress-bar-lg { height: 7px; background: var(--light); border-radius: 99px; margin-top: 10px; overflow: hidden; }
+    .progress-fill-lg { height: 100%; background: var(--red); border-radius: 99px; transition: width 0.3s; }
+
+    /* Die Kartenregion in der Mitte */
+    .card-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    /* Die Karteikarte */
+    .part-card {
+      background: var(--card-bg);
+      border-radius: 24px;
+      box-shadow: 0 16px 48px rgba(26,26,46,0.16);
+      width: 100%;
+      max-width: 340px;
+      overflow: hidden;
+      position: relative;
+      user-select: none;
+      /* transform wird per JS gesetzt beim Wischen */
+      transition: box-shadow 0.2s;
+      touch-action: none; /* verhindert Scrollen während Wischen */
+    }
+
+    .card-image-area {
+      background: var(--light);
+      height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .card-image-area img {
+      max-width: 80%;
+      max-height: 80%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .no-image { font-size: 64px; opacity: 0.35; }
+
+    /* Grüner/Roter Schleier beim Wischen */
+    .card-overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.05s;
+    }
+    .card-overlay.yes { background: rgba(0,166,80,0.25); }
+    .card-overlay.no  { background: rgba(227,0,11,0.25); }
+
+    /* Symbol in der Kartenmitte beim Wischen */
+    .card-swipe-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 72px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.05s;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+    }
+
+    .card-body { padding: 18px; }
+    .card-part-name { font-weight: 800; font-size: 18px; line-height: 1.3; margin-bottom: 12px; }
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .color-dot {
+      display: inline-block;
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(0,0,0,0.1);
+      vertical-align: middle;
+      margin-right: 5px;
+    }
+    .card-color { font-size: 14px; color: var(--gray); font-weight: 600; }
+    .card-qty {
+      background: var(--yellow);
+      color: var(--dark);
+      font-size: 22px;
+      font-weight: 900;
+      padding: 4px 14px;
+      border-radius: 12px;
+    }
+    .card-partnum { font-size: 11px; color: var(--gray); margin-top: 8px; }
+
+    /* Wisch-Hinweis unter der Karte */
+    .swipe-hint {
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 40px 4px;
+      font-size: 12px;
+      color: var(--gray);
+      font-weight: 700;
+    }
+
+    /* Aktionsknöpfe unten */
+    .action-bar {
+      padding: 12px 40px 32px;
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+    }
+    .action-btn {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: none;
+      font-size: 30px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .action-btn:active { transform: scale(0.9); box-shadow: none; }
+    .btn-no  { background: white; color: var(--red); border: 3px solid var(--red); }
+    .btn-yes { background: var(--green); color: white; }
+
+    /* --- COMPLETION SCREEN --- */
+    .completion-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .completion-screen.visible { display: flex; }
+    .completion-screen .big-emoji { font-size: 80px; margin-bottom: 20px; animation: bounce 0.6s ease; }
+    @keyframes bounce { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }
+    .completion-screen h2 { font-family: 'Lilita One', sans-serif; font-size: 28px; color: var(--dark); margin-bottom: 8px; }
+    .completion-screen .sub { font-size: 15px; color: var(--gray); margin-bottom: 24px; }
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .stat-box {
+      flex: 1;
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+    }
+    .stat-box .num { font-size: 28px; font-weight: 900; }
+    .stat-box .lbl { font-size: 12px; color: var(--gray); font-weight: 700; margin-top: 2px; }
+    .stat-box.green .num { color: var(--green); }
+    .stat-box.red .num { color: var(--red); }
+
+    /* --- MODAL OVERLAY --- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(26,26,46,0.55);
+      z-index: 300;
+      align-items: flex-end;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal-box {
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 28px 24px;
+      width: 100%;
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(40px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+    .modal-title { font-weight: 800; font-size: 18px; margin-bottom: 8px; }
+    .modal-body { font-size: 14px; color: var(--gray); line-height: 1.6; margin-bottom: 20px; }
+    .modal-actions { display: flex; gap: 10px; }
+    .modal-actions .btn { flex: 1; justify-content: center; padding: 14px; }
+    .btn-secondary { background: var(--light); color: var(--dark); }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================
+  VIEW 1: STARTBILDSCHIRM (Menü)
+  ============================================================ -->
+  <div id="view-home" class="view active">
+    <div class="header">
+      <div class="header-title">🧱 Lego<span>Check</span></div>
+      <button class="btn btn-icon" onclick="showView('search')" aria-label="Neues Set">+</button>
+    </div>
+    <div class="content" id="home-content">
+      <!-- Wird per JavaScript befüllt -->
+    </div>
+  </div>
+
+  <!-- ============================================================
+  VIEW 2: SUCHE (neues Set laden)
+  ============================================================ -->
+  <div id="view-search" class="view">
+    <div class="header">
+      <button class="btn btn-ghost" onclick="showView('home')">← Zurück</button>
+      <div class="header-title">Neues Set</div>
+      <div style="width:44px"></div>
+    </div>
+    <div class="content">
+      <div class="input-group">
+        <label class="input-label" for="set-input">Set-Nummer eingeben</label>
+        <input
+          id="set-input"
+          class="text-input"
+          type="text"
+          placeholder="z.B. 75192"
+          autocomplete="off"
+          autocorrect="off"
+          inputmode="numeric"
+        >
+        <p class="input-hint">
+          Die Set-Nummer steht auf der Vorderseite der Lego-Schachtel.<br>
+          Du kannst z.B. <strong>75192</strong> (Millennium Falcon) oder <strong>42151</strong> (Bugatti) eingeben.
+        </p>
+      </div>
+
+      <div id="search-error" class="error-box"></div>
+
+      <button class="btn btn-primary" id="load-btn" onclick="loadSet()">
+        Set laden
+      </button>
+
+      <div id="loading-state" class="loading-state">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loading-text">Lade Set-Daten…</div>
+        <div class="loading-sub" id="loading-sub">Verbinde mit Rebrickable…</div>
+      </div>
+
+      <!-- Hinweis auf API Key -->
+      <p style="font-size:12px;color:var(--gray);text-align:center;margin-top:32px;line-height:1.6;">
+        ⚠️ Trage deinen Rebrickable API Key in den Code ein (siehe Anleitung).<br>
+        Kostenloses Konto: <strong>rebrickable.com/api</strong>
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================================================
+  VIEW 3: KARTEN-SESSION
+  ============================================================ -->
+  <div id="view-session" class="view">
+    <div class="session-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div>
+          <div class="session-title" id="session-title">Set Name</div>
+          <div class="session-progress-text" id="session-progress-text">0 / 0 Teile</div>
+        </div>
+        <button class="btn btn-ghost" onclick="showExitModal()" style="color:var(--dark);font-weight:700;">✕</button>
+      </div>
+      <div class="progress-bar-lg">
+        <div class="progress-fill-lg" id="session-progress-bar" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Karte -->
+    <div class="card-area" id="card-area">
+      <div class="part-card" id="part-card">
+        <div class="card-overlay" id="card-overlay-yes" class="card-overlay yes"></div>
+        <div class="card-overlay" id="card-overlay-no" class="card-overlay no"></div>
+        <div class="card-swipe-icon" id="card-swipe-icon">✅</div>
+        <div class="card-image-area" id="card-image-area">
+          <img id="card-image" src="" alt="Bauteil" style="display:none">
+          <div class="no-image" id="card-no-image">🧱</div>
+        </div>
+        <div class="card-body">
+          <div class="card-part-name" id="card-part-name">Laden…</div>
+          <div class="card-meta">
+            <div class="card-color">
+              <span class="color-dot" id="color-dot"></span>
+              <span id="card-color-name">–</span>
+            </div>
+            <div class="card-qty" id="card-qty">×1</div>
+          </div>
+          <div class="card-partnum" id="card-partnum"></div>
+        </div>
+      </div>
+
+      <!-- Abschluss-Screen (wird über Karte gelegt) -->
+      <div class="completion-screen" id="completion-screen">
+        <div class="big-emoji">🎉</div>
+        <h2>Alle Teile geprüft!</h2>
+        <p class="sub" id="completion-sub">Du hast alle Teile durchgegangen.</p>
+        <div class="stats-row">
+          <div class="stat-box green">
+            <div class="num" id="stat-confirmed">0</div>
+            <div class="lbl">Vorhanden</div>
+          </div>
+          <div class="stat-box red">
+            <div class="num" id="stat-missing">0</div>
+            <div class="lbl">Fehlen</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="completeSet()" style="margin-bottom:12px;">
+          Set als fertig markieren ✅
+        </button>
+        <button class="btn btn-ghost" onclick="restartSession()" style="color:var(--gray);">
+          Nochmal von vorne
+        </button>
+      </div>
+    </div>
+
+    <div class="swipe-hint">
+      <span>← Fehlt</span>
+      <span>Habe ich →</span>
+    </div>
+    <div class="action-bar">
+      <button class="action-btn btn-no"  onclick="swipeCard(false)" aria-label="Fehlt">✕</button>
+      <button class="action-btn btn-yes" onclick="swipeCard(true)"  aria-label="Habe ich">✓</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+  MODAL: Sitzung beenden
+  ============================================================ -->
+  <div class="modal-overlay" id="exit-modal">
+    <div class="modal-box">
+      <div class="modal-title">Sitzung beenden?</div>
+      <div class="modal-body">Dein Fortschritt wird automatisch gespeichert. Du kannst beim nächsten Mal weitermachen.</div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="hideExitModal()">Weitermachen</button>
+        <button class="btn btn-primary" onclick="exitSession()">Speichern &amp; Beenden</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================
+  JAVASCRIPT – DIE LOGIK DER APP
+
+  Hier passiert die Magie. JavaScript macht die App interaktiv.
+  Wir nutzen drei Konzepte:
+
+  1. STATE – der aktuelle Zustand der App (welche Sets gibt es?
+     Welche Karte ist gerade aktiv? etc.)
+
+  2. RENDER – Funktionen die den State auf dem Bildschirm anzeigen
+     (immer wenn sich etwas ändert, wird der Bildschirm aktualisiert)
+
+  3. EVENTS – Reaktionen auf Benutzeraktionen (Tippen, Wischen etc.)
+  ============================================================ -->
+  <script>
+    // ============================================================
+    // KONFIGURATION
+    // ⚠️ HIER DEINEN REBRICKABLE API KEY EINTRAGEN ⚠️
+    // Kostenlos unter: https://rebrickable.com/api/
+    // ============================================================
+    const API_KEY = 'b7af931a8f0d75f5bc32351850a26b5d';
+    const BASE_URL = 'https://rebrickable.com/api/v3/lego';
+
+    // ============================================================
+    // STATE – der "Gedächtnis" der App
+    //
+    // Alles was die App wissen muss ist hier gespeichert.
+    // "sets" ist ein Array (Liste) von Objekten.
+    // Jedes Objekt hat: id, name, parts, currentIndex, isCompleted...
+    // ============================================================
+    let state = {
+      sets: [],           // Alle gespeicherten Sets
+      activeSetId: null,  // Welches Set ist gerade in der Session?
+      currentIndex: 0,    // Aktuelle Kartenposition
+    };
+
+    // ============================================================
+    // LOCAL STORAGE – dauerhaftes Speichern im Browser
+    //
+    // localStorage ist wie ein kleines Notizbuch das der Browser
+    // dauerhaft auf dem Gerät speichert. Auch nach dem Schließen
+    // der App sind die Daten noch da.
+    //
+    // JSON.stringify = JavaScript-Objekt → Text (zum Speichern)
+    // JSON.parse     = Text → JavaScript-Objekt (zum Lesen)
+    // ============================================================
+    function saveState() {
+      localStorage.setItem('lego-checker-state', JSON.stringify(state));
+    }
+
+    function loadState() {
+      const saved = localStorage.getItem('lego-checker-state');
+      if (saved) {
+        try { state = JSON.parse(saved); }
+        catch(e) { console.error('State konnte nicht geladen werden', e); }
+      }
+    }
+
+    // ============================================================
+    // NAVIGATION – zwischen Views wechseln
+    // ============================================================
+    function showView(name) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-' + name).classList.add('active');
+      if (name === 'home') renderHome();
+    }
+
+    // ============================================================
+    // HOME VIEW – Hauptmenü anzeigen
+    // ============================================================
+    function renderHome() {
+      const container = document.getElementById('home-content');
+      const sets = state.sets;
+
+      if (sets.length === 0) {
+        container.innerHTML = `
+          <div class="stud-banner">
+            <div class="icon">🧱</div>
+            <div>
+              <h2>Willkommen!</h2>
+              <p>Tippe auf + um dein erstes Set hinzuzufügen.</p>
+            </div>
+          </div>
+          <div class="empty">
+            <span class="emoji">📦</span>
+            <h3>Noch keine Sets</h3>
+            <p>Gib eine Set-Nummer ein und die App lädt alle Teile automatisch.</p>
+          </div>`;
+        return;
+      }
+
+      const active    = sets.filter(s => !s.isCompleted);
+      const completed = sets.filter(s => s.isCompleted);
+
+      let html = '';
+
+      if (active.length > 0) {
+        html += `<p class="section-label" style="margin-bottom:10px;">In Bearbeitung</p>`;
+        html += active.map(setCardHTML).join('');
+      }
+
+      if (completed.length > 0) {
+        html += `<p class="section-label" style="margin-top:20px;margin-bottom:10px;">Abgeschlossen ✅</p>`;
+        html += completed.map(setCardHTML).join('');
+      }
+
+      container.innerHTML = html;
+    }
+
+    // HTML für eine Set-Karte in der Liste
+    function setCardHTML(set) {
+      const confirmed = set.parts.filter(p => p.confirmed).length;
+      const total = set.parts.length;
+      const pct = total > 0 ? Math.round(confirmed / total * 100) : 0;
+
+      const thumb = set.imageURL
+        ? `<img src="${set.imageURL}" alt="${set.name}" onerror="this.style.display='none'">`
+        : '🧱';
+
+      const rightSide = set.isCompleted
+        ? `<span class="badge-done">✅ Fertig</span>`
+        : `<span style="font-size:12px;color:var(--gray)">${confirmed} / ${total}</span>`;
+
+      const bar = !set.isCompleted
+        ? `<div class="progress-bar"><div class="progress-fill ${pct===100?'done':''}" style="width:${pct}%"></div></div>`
+        : '';
+
+      return `
+        <div class="set-card ${set.isCompleted ? 'completed' : ''}" onclick="openSession('${set.id}')">
+          <div class="set-thumb">${thumb}</div>
+          <div class="set-info">
+            <div class="set-name">${set.name}</div>
+            <div class="set-meta" style="display:flex;justify-content:space-between;align-items:center;">
+              <span>${set.setNum} · ${set.year}</span>
+              ${rightSide}
+            </div>
+            ${bar}
+          </div>
+        </div>`;
+    }
+
+    // ============================================================
+    // SET LADEN – Rebrickable API aufrufen
+    // ============================================================
+    async function loadSet() {
+      const input = document.getElementById('set-input').value.trim();
+      if (!input) return;
+
+      // Set-Nummer aufräumen (falls kein "-1" am Ende)
+      const setNum = input.includes('-') ? input : `${input}-1`;
+
+      // UI in Ladezustand versetzen
+      document.getElementById('load-btn').style.display = 'none';
+      document.getElementById('loading-state').classList.add('visible');
+      document.getElementById('search-error').classList.remove('visible');
+      document.getElementById('loading-text').textContent = 'Lade Set-Daten…';
+      document.getElementById('loading-sub').textContent = 'Verbinde mit Rebrickable…';
+
+      try {
+        // --- Schritt 1: Set-Grunddaten holen ---
+        const setResp = await fetch(`${BASE_URL}/sets/${setNum}/`, {
+          headers: { 'Authorization': `key ${API_KEY}` }
+        });
+
+        if (!setResp.ok) throw new Error('Set nicht gefunden. Bitte prüfe die Set-Nummer.');
+        const setData = await setResp.json();
+
+        document.getElementById('loading-text').textContent = `${setData.name} gefunden!`;
+        document.getElementById('loading-sub').textContent = `Lade ${setData.num_parts} Teile…`;
+
+        // --- Schritt 2: Alle Teile holen (seitenweise) ---
+        let parts = [];
+        let nextURL = `${BASE_URL}/sets/${setNum}/parts/?page_size=100`;
+
+        // Solange eine nächste Seite existiert, weiter laden
+        while (nextURL) {
+          const resp = await fetch(nextURL, {
+            headers: { 'Authorization': `key ${API_KEY}` }
+          });
+          const data = await resp.json();
+
+          // Teile umwandeln ins App-Format
+          const pageParts = data.results.map((entry, i) => ({
+            id: `${entry.part.part_num}-${entry.color.id}`,
+            partNum: entry.part.part_num,
+            name: entry.part.name,
+            colorName: entry.color.name,
+            colorHex: entry.color.rgb ? `#${entry.color.rgb}` : null,
+            quantity: entry.quantity,
+            imageURL: entry.part.part_img_url || null,
+            confirmed: false,
+            index: parts.length + i,
+          }));
+
+          parts.push(...pageParts);
+          nextURL = data.next; // null wenn letzte Seite
+
+          document.getElementById('loading-sub').textContent =
+            `${parts.length} / ${setData.num_parts} Teile geladen…`;
+        }
+
+        // --- Schritt 3: Set in state speichern ---
+        const newSet = {
+          id: Date.now().toString(),
+          setNum: setData.set_num,
+          name: setData.name,
+          year: setData.year,
+          imageURL: setData.set_img_url || null,
+          parts: parts,
+          currentIndex: 0,
+          isCompleted: false,
+          dateStarted: new Date().toISOString(),
+        };
+
+        state.sets.unshift(newSet); // Am Anfang der Liste einfügen
+        saveState();
+
+        // Zum Startbildschirm zurück
+        document.getElementById('set-input').value = '';
+        document.getElementById('load-btn').style.display = 'block';
+        document.getElementById('loading-state').classList.remove('visible');
+        showView('home');
+
+      } catch (err) {
+        // Fehler anzeigen
+        document.getElementById('search-error').textContent = err.message;
+        document.getElementById('search-error').classList.add('visible');
+        document.getElementById('load-btn').style.display = 'block';
+        document.getElementById('loading-state').classList.remove('visible');
+      }
+    }
+
+    // ============================================================
+    // SESSION – Karten-Session starten/fortsetzen
+    // ============================================================
+    function openSession(setId) {
+      const set = state.sets.find(s => s.id === setId);
+      if (!set) return;
+
+      state.activeSetId = setId;
+      state.currentIndex = set.currentIndex || 0;
+
+      // Header aktualisieren
+      document.getElementById('session-title').textContent = set.name;
+
+      // Completion screen verstecken, Karte zeigen
+      document.getElementById('completion-screen').classList.remove('visible');
+      document.getElementById('part-card').style.display = 'block';
+
+      renderCard();
+      showView('session');
+    }
+
+    // Aktuelle Karte rendern
+    function renderCard() {
+      const set = state.sets.find(s => s.id === state.activeSetId);
+      if (!set) return;
+
+      const total = set.parts.length;
+      const idx = state.currentIndex;
+
+      // Fortschritt aktualisieren
+      const confirmed = set.parts.filter(p => p.confirmed).length;
+      document.getElementById('session-progress-text').textContent =
+        `${idx} von ${total} Teilen`;
+      document.getElementById('session-progress-bar').style.width =
+        `${total > 0 ? idx / total * 100 : 0}%`;
+
+      // Alle Karten durch → Abschluss anzeigen
+      if (idx >= total) {
+        showCompletion(set);
+        return;
+      }
+
+      const part = set.parts[idx];
+
+      // Karteninhalt setzen
+      document.getElementById('card-part-name').textContent = part.name;
+      document.getElementById('card-color-name').textContent = part.colorName;
+      document.getElementById('card-qty').textContent = `×${part.quantity}`;
+      document.getElementById('card-partnum').textContent = `Teil-Nr: ${part.partNum}`;
+
+      // Farb-Punkt
+      const dot = document.getElementById('color-dot');
+      dot.style.background = part.colorHex || colorFromName(part.colorName);
+
+      // Bild laden
+      const img = document.getElementById('card-image');
+      const noImg = document.getElementById('card-no-image');
+      if (part.imageURL) {
+        img.src = part.imageURL;
+        img.style.display = 'block';
+        noImg.style.display = 'none';
+        img.onerror = () => { img.style.display='none'; noImg.style.display='block'; };
+      } else {
+        img.style.display = 'none';
+        noImg.style.display = 'block';
+      }
+
+      // Karte zurücksetzen (falls nach Swipe-Animation)
+      const card = document.getElementById('part-card');
+      card.style.transition = 'none';
+      card.style.transform = '';
+      resetCardOverlay();
+    }
+
+    // ============================================================
+    // WISCHGESTE – Touch-Events auf der Karte
+    //
+    // touchstart  = Finger berührt Bildschirm
+    // touchmove   = Finger bewegt sich
+    // touchend    = Finger gehoben
+    //
+    // Wir berechnen wie weit der Finger horizontal gewischt hat
+    // und bewegen die Karte entsprechend.
+    // ============================================================
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let isDragging = false;
+    const SWIPE_THRESHOLD = 90; // Pixel bis es als "gewischt" gilt
+
+    document.getElementById('part-card').addEventListener('touchstart', e => {
+      if (document.getElementById('completion-screen').classList.contains('visible')) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      isDragging = true;
+      document.getElementById('part-card').style.transition = 'none';
+    }, { passive: true });
+
+    document.getElementById('part-card').addEventListener('touchmove', e => {
+      if (!isDragging) return;
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+
+      // Wenn mehr vertikal als horizontal: nicht als Swipe werten
+      if (Math.abs(dy) > Math.abs(dx) * 1.5) { isDragging = false; return; }
+
+      const rotate = dx / 20; // leichte Drehung
+      document.getElementById('part-card').style.transform =
+        `translateX(${dx}px) rotate(${rotate}deg)`;
+
+      updateCardOverlay(dx);
+    }, { passive: true });
+
+    document.getElementById('part-card').addEventListener('touchend', e => {
+      if (!isDragging) return;
+      isDragging = false;
+
+      const dx = e.changedTouches[0].clientX - touchStartX;
+
+      if (dx > SWIPE_THRESHOLD) {
+        animateOut('right');
+      } else if (dx < -SWIPE_THRESHOLD) {
+        animateOut('left');
+      } else {
+        // Zurück zur Mitte
+        document.getElementById('part-card').style.transition =
+          'transform 0.35s cubic-bezier(0.34,1.56,0.64,1)';
+        document.getElementById('part-card').style.transform = '';
+        resetCardOverlay();
+      }
+    });
+
+    // Karte animiert rausfliegen lassen
+    function animateOut(direction) {
+      const card = document.getElementById('part-card');
+      card.style.transition = 'transform 0.3s ease-in';
+      card.style.transform =
+        direction === 'right'
+          ? 'translateX(120vw) rotate(20deg)'
+          : 'translateX(-120vw) rotate(-20deg)';
+
+      // Nach Animation: nächste Karte
+      setTimeout(() => {
+        swipeCard(direction === 'right');
+      }, 280);
+    }
+
+    // Farb-Overlay beim Wischen
+    function updateCardOverlay(dx) {
+      const overlayYes = document.getElementById('card-overlay-yes');
+      const overlayNo  = document.getElementById('card-overlay-no');
+      const icon = document.getElementById('card-swipe-icon');
+      const strength = Math.min(Math.abs(dx) / SWIPE_THRESHOLD, 1);
+
+      if (dx > 20) {
+        overlayYes.style.opacity = strength * 0.6;
+        overlayNo.style.opacity = 0;
+        icon.textContent = '✅';
+        icon.style.opacity = strength;
+      } else if (dx < -20) {
+        overlayNo.style.opacity = strength * 0.6;
+        overlayYes.style.opacity = 0;
+        icon.textContent = '❌';
+        icon.style.opacity = strength;
+      } else {
+        resetCardOverlay();
+      }
+    }
+
+    function resetCardOverlay() {
+      document.getElementById('card-overlay-yes').style.opacity = 0;
+      document.getElementById('card-overlay-no').style.opacity = 0;
+      document.getElementById('card-swipe-icon').style.opacity = 0;
+    }
+
+    // ============================================================
+    // SWIPE-AKTION – Teil bestätigen oder ablehnen
+    // (wird sowohl von Wischgeste als auch von Knöpfen aufgerufen)
+    // ============================================================
+    function swipeCard(confirmed) {
+      const set = state.sets.find(s => s.id === state.activeSetId);
+      if (!set || state.currentIndex >= set.parts.length) return;
+
+      // Teil als bestätigt/nicht-bestätigt markieren
+      set.parts[state.currentIndex].confirmed = confirmed;
+      state.currentIndex++;
+      set.currentIndex = state.currentIndex;
+
+      saveState(); // Sofort speichern!
+      renderCard();
+    }
+
+    // ============================================================
+    // ABSCHLUSS-SCREEN
+    // ============================================================
+    function showCompletion(set) {
+      document.getElementById('part-card').style.display = 'none';
+      document.getElementById('completion-screen').classList.add('visible');
+
+      const confirmed = set.parts.filter(p => p.confirmed).length;
+      const missing = set.parts.length - confirmed;
+      document.getElementById('stat-confirmed').textContent = confirmed;
+      document.getElementById('stat-missing').textContent = missing;
+      document.getElementById('completion-sub').textContent =
+        missing > 0
+          ? `${missing} Teil${missing > 1 ? 'e fehlen' : ' fehlt'} in deiner Sammlung.`
+          : 'Alle Teile sind vorhanden – perfekt! 🏆';
+    }
+
+    function completeSet() {
+      const set = state.sets.find(s => s.id === state.activeSetId);
+      if (set) {
+        set.isCompleted = true;
+        set.dateCompleted = new Date().toISOString();
+        saveState();
+      }
+      showView('home');
+    }
+
+    function restartSession() {
+      const set = state.sets.find(s => s.id === state.activeSetId);
+      if (set) {
+        set.parts.forEach(p => p.confirmed = false);
+        set.currentIndex = 0;
+        saveState();
+      }
+      state.currentIndex = 0;
+      document.getElementById('completion-screen').classList.remove('visible');
+      document.getElementById('part-card').style.display = 'block';
+      renderCard();
+    }
+
+    // ============================================================
+    // EXIT MODAL
+    // ============================================================
+    function showExitModal() { document.getElementById('exit-modal').classList.add('visible'); }
+    function hideExitModal() { document.getElementById('exit-modal').classList.remove('visible'); }
+    function exitSession() {
+      hideExitModal();
+      showView('home');
+    }
+
+    // ============================================================
+    // HILFSFUNKTION: Farbe aus englischem Farbnamen
+    // ============================================================
+    function colorFromName(name) {
+      const n = (name || '').toLowerCase();
+      if (n.includes('red'))    return '#E3000B';
+      if (n.includes('blue'))   return '#0057A8';
+      if (n.includes('green'))  return '#00A650';
+      if (n.includes('yellow')) return '#FFD700';
+      if (n.includes('orange')) return '#FF7300';
+      if (n.includes('white'))  return '#F5F5F5';
+      if (n.includes('black'))  return '#1A1A1A';
+      if (n.includes('gray') || n.includes('grey')) return '#9A9A9A';
+      if (n.includes('brown'))  return '#7B4F1F';
+      if (n.includes('pink'))   return '#FFB3C6';
+      if (n.includes('purple')) return '#9B30FF';
+      if (n.includes('tan'))    return '#D2B48C';
+      if (n.includes('sand'))   return '#C2A07A';
+      return '#AAAAAA';
+    }
+
+    // ============================================================
+    // ENTER-TASTE im Suchfeld
+    // ============================================================
+    document.getElementById('set-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') loadSet();
+    });
+
+    // ============================================================
+    // APP START
+    // ============================================================
+
+    // Service Worker registrieren (für PWA-Funktionalität)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+          console.log('Service Worker Fehler (lokal okay):', err);
+        });
+      });
+    }
+
+    // Gespeicherten State laden beim Start
+    loadState();
+    renderHome();
+  </script>
+</body>
+</html>
