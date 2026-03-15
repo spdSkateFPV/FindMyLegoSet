@@ -14,7 +14,7 @@ const CACHE_NAME = 'lego-checker-v1';
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(['/', '/index.html', '/manifest.json', '/icon.svg']);
+      return cache.addAll(['/lego-checker/', '/lego-checker/index.html', '/lego-checker/manifest.json', '/lego-checker/icon.svg']);
     })
   );
   self.skipWaiting();
