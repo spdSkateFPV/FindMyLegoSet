@@ -544,7 +544,8 @@
       document.getElementById('action-bar').style.display='none';
       document.getElementById('completion-screen').classList.add('visible');
       const confirmed=set.parts.reduce((s,p)=>s+(p.confirmedCount||0),0);
-      const missing=cardList.length-confirmed;
+      const totalPieces=set.parts.reduce((s,p)=>s+p.quantity,0);
+      const missing=totalPieces-confirmed;
       document.getElementById('stat-confirmed').textContent=confirmed;
       document.getElementById('stat-missing').textContent=missing;
       document.getElementById('completion-sub').textContent=missing>0?missing+' Stück fehlen noch.':'Alle Teile vorhanden – perfekt! 🏆';
