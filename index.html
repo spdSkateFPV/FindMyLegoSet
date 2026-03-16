@@ -289,6 +289,7 @@
     let sessionHistory = [];
     let popupContext   = null;
     let repeatMode     = false;
+    let swipeLock      = false;  // verhindert Doppel-Swipe
 
     function migrateSet(set) {
       set.parts.forEach(p => {
@@ -413,6 +414,7 @@
     }
 
     function renderCard() {
+      swipeLock = false;  // Sperre aufheben wenn neue Karte gerendert wird
       const set=state.sets.find(s=>s.id===activeSetId);
       if (!set) return;
       const total=cardList.length;
@@ -438,8 +440,10 @@
     }
 
     function swipeCard(confirmed) {
+      if (swipeLock) return;  // Doppel-Swipe verhindern
+      swipeLock = true;
       const set=state.sets.find(s=>s.id===activeSetId);
-      if (!set||currentIndex>=cardList.length) return;
+      if (!set||currentIndex>=cardList.length) { swipeLock=false; return; }
       const {partIdx}=cardList[currentIndex];
       const p=set.parts[partIdx];
       sessionHistory.push({partIdx, wasConfirmed:confirmed});
@@ -486,6 +490,7 @@
       else{document.getElementById('part-card').style.transition='transform 0.35s cubic-bezier(0.34,1.56,0.64,1)';document.getElementById('part-card').style.transform='';resetOverlay();}
     });
     function animOut(dir){
+      swipeLock = true;  // sofort sperren beim Wischen
       const c=document.getElementById('part-card');
       c.style.transition='transform 0.3s ease-in';
       c.style.transform=dir==='right'?'translateX(120vw) rotate(20deg)':'translateX(-120vw) rotate(-20deg)';
