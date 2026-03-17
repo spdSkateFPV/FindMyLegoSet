@@ -137,6 +137,17 @@
     .popup-actions { display:flex; flex-direction:column; gap:10px; width:100%; max-width:320px; }
     .btn-popup-found { background:var(--green); color:white; padding:14px; font-size:16px; justify-content:center; border-radius:16px; }
     .btn-popup-close { background:rgba(255,255,255,0.15); color:white; padding:12px; font-size:15px; justify-content:center; border-radius:16px; }
+
+    .btn-list { background:white; color:var(--dark); border:3px solid var(--light); width:52px; height:52px; font-size:20px; box-shadow:0 4px 12px rgba(0,0,0,0.08); position:relative; }
+    .btn-list .missing-badge { position:absolute; top:-4px; right:-4px; background:var(--red); color:white; font-size:10px; font-weight:900; min-width:18px; height:18px; border-radius:99px; display:flex; align-items:center; justify-content:center; padding:0 4px; }
+    .missing-sheet { display:none; position:fixed; inset:0; background:rgba(26,26,46,0.55); z-index:400; align-items:flex-end; padding:16px; backdrop-filter:blur(4px); }
+    .missing-sheet.visible { display:flex; }
+    .missing-sheet-box { background:var(--card-bg); border-radius:24px; width:100%; max-height:70vh; display:flex; flex-direction:column; animation:slideUp 0.25s ease; overflow:hidden; }
+    .missing-sheet-header { padding:18px 20px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--light); flex-shrink:0; }
+    .missing-sheet-title { font-weight:800; font-size:17px; }
+    .missing-sheet-close { background:var(--light); border:none; width:32px; height:32px; border-radius:99px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .missing-sheet-list { overflow-y:auto; padding:12px 16px 20px; }
+    .missing-sheet-empty { text-align:center; padding:32px; color:var(--gray); font-weight:700; font-size:15px; }
   </style>
 </head>
 <body>
@@ -235,6 +246,19 @@
       <button class="action-btn btn-back" id="btn-back" onclick="goBack()" disabled>&#x21A9;</button>
       <button class="action-btn btn-no"   onclick="swipeCard(false)">&#x2715;</button>
       <button class="action-btn btn-yes"  onclick="swipeCard(true)">&#x2713;</button>
+      <button class="action-btn btn-list" id="btn-list" onclick="openMissingSheet()">&#x1F50D;<span class="missing-badge" id="missing-badge" style="display:none">0</span></button>
+    </div>
+  </div>
+
+
+  <!-- SHEET: Fehlende Teile während Session -->
+  <div class="missing-sheet" id="missing-sheet" onclick="closeMissingSheetOnBg(event)">
+    <div class="missing-sheet-box">
+      <div class="missing-sheet-header">
+        <div class="missing-sheet-title">&#x274C; Fehlende Teile</div>
+        <button class="missing-sheet-close" onclick="closeMissingSheet()">&#x2715;</button>
+      </div>
+      <div class="missing-sheet-list" id="missing-sheet-list"></div>
     </div>
   </div>
 
@@ -438,7 +462,7 @@
       document.getElementById('part-card').style.display='block';
       document.getElementById('swipe-hint').style.display='flex';
       document.getElementById('action-bar').style.display='flex';
-      renderCard(); showView('session');
+      renderCard(); updateMissingBadge(); showView('session');
     }
 
     function computeStartIndex(set) {
@@ -486,7 +510,7 @@
       currentIndex++;
       // Only save currentIndex to set if NOT in repeat mode
       if (!repeatMode) set.currentIndex = currentIndex;
-      saveState(); renderCard();
+      saveState(); renderCard(); updateMissingBadge();
     }
 
     function goBack() {
@@ -496,7 +520,7 @@
       const p=set.parts[last.partIdx];
       if (last.wasConfirmed) p.confirmedCount = Math.max(0, (p.confirmedCount||0) - 1);
       currentIndex--; set.currentIndex=currentIndex;
-      saveState();
+      saveState(); updateMissingBadge();
       document.getElementById('completion-screen').classList.remove('visible');
       document.getElementById('part-card').style.display='block';
       document.getElementById('swipe-hint').style.display='flex';
@@ -579,7 +603,7 @@
         const set=state.sets.find(s=>s.id===popupContext.setId);
         const p=set&&set.parts.find(x=>x.id===popupContext.partId);
         if(p){p.confirmedCount=p.quantity;saveState();}
-        closeImagePopup();if(set)showCompletion(set);
+        closeImagePopup(); updateMissingBadge(); if(document.getElementById('missing-sheet').classList.contains('visible'))openMissingSheet(); if(set)showCompletion(set);
       }
     }
 
@@ -656,7 +680,46 @@
       openSession(activeSetId);
     }
 
-        function showExitModal(){document.getElementById('exit-modal').classList.add('visible');}
+    
+    function updateMissingBadge() {
+      const set = state.sets.find(s=>s.id===activeSetId);
+      if (!set) return;
+      const count = set.parts.reduce((s,p)=>s+(p.quantity-(p.confirmedCount||0)),0);
+      const badge = document.getElementById('missing-badge');
+      if (count > 0) { badge.textContent=count; badge.style.display='flex'; }
+      else { badge.style.display='none'; }
+    }
+
+    function openMissingSheet() {
+      const set = state.sets.find(s=>s.id===activeSetId);
+      if (!set) return;
+      const mp = set.parts.filter(p=>(p.confirmedCount||0)<p.quantity);
+      const list = document.getElementById('missing-sheet-list');
+      if (!mp.length) {
+        list.innerHTML = '<div class="missing-sheet-empty">&#x1F389; Keine fehlenden Teile!</div>';
+      } else {
+        list.innerHTML = mp.map(p => {
+          const m = p.quantity-(p.confirmedCount||0);
+          const img = p.imageURL
+            ? '<img src="'+p.imageURL+'" alt="" onerror="this.style.display='none'">'
+            : '&#x1F9F1;';
+          return '<div class="missing-item"><div class="missing-item-img" onclick="openMissingPartPopup(''+activeSetId+'',''+p.id+'')">'+img+'</div>'
+            +'<div class="missing-item-info"><div class="missing-item-name">'+p.name+'</div>'
+            +'<div class="missing-item-meta">'+p.colorName+' &middot; '+p.partNum+'</div></div>'
+            +'<div class="missing-item-qty">'+m+'&times; fehlt</div></div>';
+        }).join('');
+      }
+      document.getElementById('missing-sheet').classList.add('visible');
+    }
+
+    function closeMissingSheet() {
+      document.getElementById('missing-sheet').classList.remove('visible');
+    }
+    function closeMissingSheetOnBg(e) {
+      if (e.target.id==='missing-sheet') closeMissingSheet();
+    }
+
+    function showExitModal(){document.getElementById('exit-modal').classList.add('visible');}
     function hideExitModal(){document.getElementById('exit-modal').classList.remove('visible');}
     function exitSession(){hideExitModal();showView('home');}
 
