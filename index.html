@@ -292,10 +292,39 @@
     let isAnimating    = false;  // verhindert Doppel-Swipe
 
     function migrateSet(set) {
+      // Step 1: migrate old confirmed boolean/number to confirmedCount
       set.parts.forEach(p => {
         if (typeof p.confirmed === 'boolean') { p.confirmedCount = p.confirmed ? p.quantity : 0; delete p.confirmed; }
         if (typeof p.confirmedCount === 'undefined') p.confirmedCount = 0;
       });
+
+      // Step 2: deduplicate parts with same part_num + color
+      // (can happen if set was loaded before deduplication was added, or Rebrickable returned dupes)
+      const seen = {};
+      const deduped = [];
+      set.parts.forEach(p => {
+        const key = p.partNum + '-' + (p.id || p.partNum);
+        if (seen[key] !== undefined) {
+          // Merge into existing entry
+          deduped[seen[key]].quantity      += p.quantity;
+          deduped[seen[key]].confirmedCount = Math.min(
+            deduped[seen[key]].confirmedCount + (p.confirmedCount || 0),
+            deduped[seen[key]].quantity
+          );
+        } else {
+          seen[key] = deduped.length;
+          deduped.push(Object.assign({}, p));
+        }
+      });
+      if (deduped.length !== set.parts.length) {
+        console.log('Deduplicated', set.name, ': ', set.parts.length, '->', deduped.length, 'parts');
+        set.parts = deduped;
+        // Recalculate currentIndex based on confirmed counts
+        let idx = 0;
+        set.parts.forEach(p => { idx += p.confirmedCount || 0; });
+        set.currentIndex = idx;
+      }
+
       return set;
     }
 
