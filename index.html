@@ -701,9 +701,9 @@
         list.innerHTML = mp.map(p => {
           const m = p.quantity-(p.confirmedCount||0);
           const img = p.imageURL
-            ? '<img src="'+p.imageURL+'" alt="" onerror="this.style.display='none'">'
+            ? '<img src="'+p.imageURL+'" alt="" onerror="this.style.display=\'none\'">'
             : '&#x1F9F1;';
-          return '<div class="missing-item"><div class="missing-item-img" onclick="openMissingPartPopup(''+activeSetId+'',''+p.id+'')">'+img+'</div>'
+          return '<div class="missing-item"><div class="missing-item-img" onclick="openMissingPartPopup(\''+activeSetId+'\',\''+p.id+'\')">'+img+'</div>'
             +'<div class="missing-item-info"><div class="missing-item-name">'+p.name+'</div>'
             +'<div class="missing-item-meta">'+p.colorName+' &middot; '+p.partNum+'</div></div>'
             +'<div class="missing-item-qty">'+m+'&times; fehlt</div></div>';
