@@ -116,6 +116,8 @@
     .missing-item-name { font-weight:700; font-size:13px; line-height:1.3; }
     .missing-item-meta { font-size:11px; color:var(--gray); margin-top:2px; }
     .missing-item-qty { font-size:13px; font-weight:800; color:var(--red); flex-shrink:0; }
+    .missing-item.past { opacity:0.45; background:var(--light); border-left-color:var(--gray); cursor:default; }
+    .missing-item.past .missing-item-img { cursor:default; pointer-events:none; }
     .modal-overlay { display:none; position:fixed; inset:0; background:rgba(26,26,46,0.55); z-index:400; align-items:flex-end; padding:20px; backdrop-filter:blur(4px); }
     .modal-overlay.visible { display:flex; }
     .modal-box { background:var(--card-bg); border-radius:24px; padding:28px 24px; width:100%; animation:slideUp 0.25s ease; }
@@ -439,7 +441,11 @@
 
     function buildCardList(set) {
       const list=[];
-      set.parts.forEach((p,pi)=>{ for(let i=1;i<=p.quantity;i++) list.push({partIdx:pi,instance:i,total:p.quantity}); });
+      set.parts.forEach((p,pi)=>{
+        const already = p.confirmedCount||0;
+        // Start from instance (already+1) so confirmed instances are skipped
+        for(let i=already+1;i<=p.quantity;i++) list.push({partIdx:pi,instance:i,total:p.quantity});
+      });
       return list;
     }
 
@@ -478,8 +484,10 @@
       const set=state.sets.find(s=>s.id===activeSetId);
       if (!set) return;
       const total=cardList.length;
-      document.getElementById('session-progress-text').textContent=currentIndex+' / '+total+' Stück';
-      document.getElementById('session-progress-bar').style.width=(total?currentIndex/total*100:0)+'%';
+      const confirmedTotal = set.parts.reduce((s,p)=>s+(p.confirmedCount||0),0);
+      const totalPieces    = set.parts.reduce((s,p)=>s+p.quantity,0);
+      document.getElementById('session-progress-text').textContent=confirmedTotal+' / '+totalPieces+' gefunden';
+      document.getElementById('session-progress-bar').style.width=(totalPieces?confirmedTotal/totalPieces*100:0)+'%';
       document.getElementById('btn-back').disabled=sessionHistory.length===0;
       if (currentIndex>=total) { showCompletion(set); return; }
       const {partIdx,instance,total:qty}=cardList[currentIndex];
@@ -576,7 +584,8 @@
       document.getElementById('image-popup').classList.add('visible');
     }
 
-    function openMissingPartPopup(setId,partId){
+    function openMissingPartPopup(setId,partId,event){
+      if(event) event.stopPropagation();
       const set=state.sets.find(s=>s.id===setId);
       const p=set&&set.parts.find(x=>x.id===partId);if(!p)return;
       const missing=p.quantity-(p.confirmedCount||0);
@@ -617,24 +626,25 @@
       }
     }
 
-    // Rebuild cardList after a part was marked found mid-session,
-    // removing the card that was just found and adjusting currentIndex
+    // Rebuild cardList after a part was marked found mid-session
     function rebuildCardListAfterFound(set, foundPart) {
       if(repeatMode) {
-        // In repeat mode: just remove one entry for this part from cardList
+        // In repeat mode: remove one entry for this part from cardList
         const pi = set.parts.indexOf(foundPart);
-        const idx = cardList.findIndex(c => c.partIdx === pi && c.instance > (foundPart.confirmedCount-1));
+        const idx = cardList.findIndex(c => c.partIdx === pi);
         if(idx !== -1) {
           cardList.splice(idx, 1);
           if(idx < currentIndex) currentIndex = Math.max(0, currentIndex - 1);
         }
       } else {
-        // Normal mode: rebuild full cardList, find new currentIndex
-        const oldCardListLength = cardList.length;
+        // Normal mode: rebuild cardList (now skips confirmed instances)
+        // Calculate how many cards before currentIndex belong to this part
+        const pi = set.parts.indexOf(foundPart);
+        const cardsBeforeCursor = cardList.slice(0, currentIndex).filter(c=>c.partIdx===pi).length;
         cardList = buildCardList(set);
-        // currentIndex stays the same – the found card was likely ahead of cursor
-        currentIndex = Math.min(currentIndex, cardList.length);
-        if(!repeatMode) set.currentIndex = currentIndex;
+        // If the found card was before cursor, shift currentIndex back by 1
+        currentIndex = Math.max(0, Math.min(currentIndex - (cardsBeforeCursor > 0 ? 1 : 0), cardList.length));
+        set.currentIndex = currentIndex;
       }
     }
 
@@ -729,15 +739,27 @@
       if (!mp.length) {
         list.innerHTML = '<div class="missing-sheet-empty">&#x1F389; Keine fehlenden Teile!</div>';
       } else {
+        // A part is "past" (already swiped away as missing) if all its
+        // remaining cards appear before currentIndex in cardList
+        // Find which partIdx is on the current card
+        const currentPartIdx = (currentIndex < cardList.length) ? cardList[currentIndex].partIdx : -1;
         list.innerHTML = mp.map(p => {
-          const m = p.quantity-(p.confirmedCount||0);
-          const img = p.imageURL
+          const pi = set.parts.indexOf(p);
+          const m  = p.quantity-(p.confirmedCount||0);
+          // Only grey out the part that is on the CURRENT card
+          const isCurrent = pi === currentPartIdx;
+          const cls   = isCurrent ? 'missing-item past' : 'missing-item';
+          const click = isCurrent ? '' : 'onclick="openMissingPartPopup(\''+activeSetId+'\',\''+p.id+'\',event)"';
+          const img   = p.imageURL
             ? '<img src="'+p.imageURL+'" alt="" onerror="this.style.display=\'none\'">'
             : '&#x1F9F1;';
-          return '<div class="missing-item"><div class="missing-item-img" onclick="openMissingPartPopup(\''+activeSetId+'\',\''+p.id+'\')">'+img+'</div>'
+          const label = isCurrent
+            ? '<span style="font-size:11px;color:var(--gray)">aktuelle Karte</span>'
+            : m+'&times; fehlt';
+          return '<div class="'+cls+'"><div class="missing-item-img" '+click+'>'+img+'</div>'
             +'<div class="missing-item-info"><div class="missing-item-name">'+p.name+'</div>'
             +'<div class="missing-item-meta">'+p.colorName+' &middot; '+p.partNum+'</div></div>'
-            +'<div class="missing-item-qty">'+m+'&times; fehlt</div></div>';
+            +'<div class="missing-item-qty">'+label+'</div></div>';
         }).join('');
       }
       document.getElementById('missing-sheet').classList.add('visible');
