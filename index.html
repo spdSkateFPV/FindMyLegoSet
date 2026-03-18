@@ -602,8 +602,39 @@
       else if(popupContext.type==='missing'){
         const set=state.sets.find(s=>s.id===popupContext.setId);
         const p=set&&set.parts.find(x=>x.id===popupContext.partId);
-        if(p){p.confirmedCount=p.quantity;saveState();}
-        closeImagePopup(); updateMissingBadge(); if(document.getElementById('missing-sheet').classList.contains('visible'))openMissingSheet(); if(set)showCompletion(set);
+        if(p && (p.confirmedCount||0) < p.quantity){
+          p.confirmedCount = (p.confirmedCount||0) + 1;
+          saveState();
+          // Rebuild cardList so the marked card disappears from session
+          rebuildCardListAfterFound(set, p);
+        }
+        closeImagePopup();
+        updateMissingBadge();
+        // Refresh sheet if open
+        if(document.getElementById('missing-sheet').classList.contains('visible')) openMissingSheet();
+        // Only go to completion if we're already past all cards
+        if(currentIndex >= cardList.length) showCompletion(set);
+      }
+    }
+
+    // Rebuild cardList after a part was marked found mid-session,
+    // removing the card that was just found and adjusting currentIndex
+    function rebuildCardListAfterFound(set, foundPart) {
+      if(repeatMode) {
+        // In repeat mode: just remove one entry for this part from cardList
+        const pi = set.parts.indexOf(foundPart);
+        const idx = cardList.findIndex(c => c.partIdx === pi && c.instance > (foundPart.confirmedCount-1));
+        if(idx !== -1) {
+          cardList.splice(idx, 1);
+          if(idx < currentIndex) currentIndex = Math.max(0, currentIndex - 1);
+        }
+      } else {
+        // Normal mode: rebuild full cardList, find new currentIndex
+        const oldCardListLength = cardList.length;
+        cardList = buildCardList(set);
+        // currentIndex stays the same – the found card was likely ahead of cursor
+        currentIndex = Math.min(currentIndex, cardList.length);
+        if(!repeatMode) set.currentIndex = currentIndex;
       }
     }
 
