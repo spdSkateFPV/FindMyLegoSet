@@ -462,7 +462,7 @@
       });
       activeSetId=setId; cardList=buildCardList(set); sessionHistory=[]; repeatMode=false;
       // Use the saved index directly – computeStartIndex was broken for left-swipes
-      currentIndex = Math.min(set.currentIndex || 0, cardList.length);
+      currentIndex = 0; // buildCardList skips confirmed, so list always starts at next unconfirmed
       document.getElementById('session-title').textContent=set.name;
       document.getElementById('completion-screen').classList.remove('visible');
       document.getElementById('part-card').style.display='block';
@@ -484,10 +484,7 @@
       const set=state.sets.find(s=>s.id===activeSetId);
       if (!set) return;
       const total=cardList.length;
-      const confirmedTotal = set.parts.reduce((s,p)=>s+(p.confirmedCount||0),0);
-      const totalPieces    = set.parts.reduce((s,p)=>s+p.quantity,0);
-      document.getElementById('session-progress-text').textContent=confirmedTotal+' / '+totalPieces+' gefunden';
-      document.getElementById('session-progress-bar').style.width=(totalPieces?confirmedTotal/totalPieces*100:0)+'%';
+      updateProgressDisplay(set);
       document.getElementById('btn-back').disabled=sessionHistory.length===0;
       if (currentIndex>=total) { showCompletion(set); return; }
       const {partIdx,instance,total:qty}=cardList[currentIndex];
@@ -646,6 +643,15 @@
         currentIndex = Math.max(0, Math.min(currentIndex - (cardsBeforeCursor > 0 ? 1 : 0), cardList.length));
         set.currentIndex = currentIndex;
       }
+      // Update progress bar immediately
+      updateProgressDisplay(set);
+    }
+
+    function updateProgressDisplay(set) {
+      const confirmedTotal = set.parts.reduce((s,p)=>s+(p.confirmedCount||0),0);
+      const totalPieces    = set.parts.reduce((s,p)=>s+p.quantity,0);
+      document.getElementById('session-progress-text').textContent = confirmedTotal+' / '+totalPieces+' gefunden';
+      document.getElementById('session-progress-bar').style.width = (totalPieces ? confirmedTotal/totalPieces*100 : 0)+'%';
     }
 
     function showCompletion(set){
