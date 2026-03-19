@@ -461,8 +461,12 @@
         }
       });
       activeSetId=setId; cardList=buildCardList(set); sessionHistory=[]; repeatMode=false;
-      // Use the saved index directly – computeStartIndex was broken for left-swipes
-      currentIndex = 0; // buildCardList skips confirmed, so list always starts at next unconfirmed
+      // Restore position by finding the saved card identity in the new list
+      currentIndex = 0;
+      if (set.resumePartIdx != null) {
+        const idx = cardList.findIndex(c => c.partIdx === set.resumePartIdx && c.instance === set.resumeInstance);
+        if (idx !== -1) currentIndex = idx;
+      }
       document.getElementById('session-title').textContent=set.name;
       document.getElementById('completion-screen').classList.remove('visible');
       document.getElementById('part-card').style.display='block';
@@ -513,8 +517,18 @@
       sessionHistory.push({partIdx, wasConfirmed:confirmed});
       if (confirmed) p.confirmedCount = (p.confirmedCount||0) + 1;
       currentIndex++;
-      // Only save currentIndex to set if NOT in repeat mode
-      if (!repeatMode) set.currentIndex = currentIndex;
+      if (!repeatMode) {
+        set.currentIndex = currentIndex;
+        // Save identity of NEW current card so we can restore position later
+        if (currentIndex < cardList.length) {
+          const next = cardList[currentIndex];
+          set.resumePartIdx = next.partIdx;
+          set.resumeInstance = next.instance;
+        } else {
+          set.resumePartIdx = null;
+          set.resumeInstance = null;
+        }
+      }
       saveState(); renderCard(); updateMissingBadge();
     }
 
@@ -524,7 +538,14 @@
       const set=state.sets.find(s=>s.id===activeSetId);
       const p=set.parts[last.partIdx];
       if (last.wasConfirmed) p.confirmedCount = Math.max(0, (p.confirmedCount||0) - 1);
-      currentIndex--; set.currentIndex=currentIndex;
+      currentIndex--;
+      if (!repeatMode) {
+        set.currentIndex = currentIndex;
+        if (currentIndex < cardList.length) {
+          set.resumePartIdx = cardList[currentIndex].partIdx;
+          set.resumeInstance = cardList[currentIndex].instance;
+        }
+      }
       saveState(); updateMissingBadge();
       document.getElementById('completion-screen').classList.remove('visible');
       document.getElementById('part-card').style.display='block';
